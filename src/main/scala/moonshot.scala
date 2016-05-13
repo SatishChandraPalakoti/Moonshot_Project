@@ -5,7 +5,6 @@
 
 
 import java.sql.{DriverManager, Connection}
-
 import org.apache.spark.mllib.classification.NaiveBayes
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
@@ -60,12 +59,12 @@ object moonshot {
       }
       val training=parsedData
       val testval=a
-      println("This is the test val: " + testval)
+      //      println("This is the test val: " + testval)
       val test = Vectors.dense(testval)
       val model=NaiveBayes.train(training, lambda = 1.0, modelType = "multinomial")
       //      model.save(sc,"/NaiveBayesModel")
       val predictionlabel= model.predict(test)
-      println("The prediction for the input is: "+ predictionlabel.toString)
+      //      println("The prediction for the input is: "+ predictionlabel.toString)
       if(predictionlabel==1.0)
         return "APPROVED"
       else
@@ -83,32 +82,36 @@ object moonshot {
   }
 
 
-  def myinsert_db(result:String) : Int = {
+  def myinsert_db(sex: String,x: Array[Double],result:String) : Int = {
     val driver = "com.mysql.jdbc.Driver"
     val url = "jdbc:mysql://ec2-52-37-241-124.us-west-2.compute.amazonaws.com/credit_data"
     val username = "root"
     val password = "password"
     try{
-
       var connection: Connection = null
       connection = DriverManager.getConnection(url, username, password)
       val statement = connection.createStatement()
-      val myquery = "insert into dummy_credit_predict (dummy) values ('" + result + "')"
-      val resultset = statement.executeUpdate(myquery)
+      // val myquery = "insert into dummy_credit_predict (dummy) values ('" + result + "')"
+
+
+      val finalquery="insert into moonshot_results (Male,Age,Debt,Married,EducationLevel, Ethnicity,YearsEmployed,PriorDefault, Employed, CreditScore, DriversLicense,Citizen,ZipCode,Income, Prediction) values ('"+sex+"',"+x(0)+","+x(1)+","+x(2)+","+x(3)+","+x(4)+","+x(5)+","+x(6)+","+x(7)+","+x(8)+","+x(9)+","+x(10)+","+x(11)+","+x(12)+",'"+result+"')"
+      //print(finalquery)
+      val resultset = statement.executeUpdate(finalquery)
       return 1
     }
     catch {
       case e:Exception =>{
+        print(e)
         return 0
       }
     }
   }
-
+  3
   def main(args: Array[String]): Unit = {
 
     val props = new java.util.Properties()
     props.put("zookeeper.connect", "ec2-52-39-155-4.us-west-2.compute.amazonaws.com:2181")
-    props.put("group.id", "stream")
+    props.put("group.id", "testing")
     props.put("zookeeper.session.timeout", "500")
     props.put("zookeeper.sync.time.ms", "300")
     props.put("auto.commit.interval.ms", "1000")
@@ -121,7 +124,7 @@ object moonshot {
 
     val consumer = kafka.consumer.Consumer.create(config)
 
-    val topicName = "stream"
+    val topicName = "testing"
 
     val numThreads = 1
 
@@ -133,22 +136,28 @@ object moonshot {
 
     val msgs = consumerIterator.map(_.message())
 
-    //    msgs.foreach { msg => val x = new String(msg)
-    //      val y = x.split(',')
-    //      var g = ArrayBuffer[Double]()
-    //      y.foreach(k=> g+=k.toDouble)
-    //      print(g)
-    //    }
 
     msgs.foreach { msg => val x = new String(msg)
-      val y = x.split(',')
+      var gender = " "
+      print("Gender is :"+x.charAt(0))
+      if(x.charAt(0)=='1'){
+        gender="MALE"
+      }
+      else{
+        gender="FEMALE"
+      }
+      val w=x.substring(2,x.length)
+      print("\nThe substring is: "+ w)
+      val y = w.split(',')
+//      y(0)=null
       val z = y.map(each => each.toDouble)
       //      val res=myfun(z)
-      val u=myinsert_db(myfun(z,sc))
+
+      val u=myinsert_db(gender,z,myfun(z,sc))
       if(u!=1)
-        print("Failed to push into database ")
+        print("Failed to push into database\n")
       else
-        print("Database updated !")
+        print("Database updated !\n")
     }
   }
 }
